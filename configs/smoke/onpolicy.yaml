@@ -1,0 +1,50 @@
+# SMOKE TEST copy of configs/onpolicy.yaml: 10 steps of 8 prompts from data/smoke/, small evals.
+#   python -m scripts.distill_onpolicy --config configs/smoke/onpolicy.yaml --base <weights> \
+#       --ckpt-root <scratch>/ckpt --log-root <scratch>/logs
+
+teacher: Qwen3-0.6B
+source: sft
+system_prompts: configs/smoke/offpolicy.yaml
+prompts: data/smoke/prompts_onpolicy.jsonl
+heldout: data/smoke/prompts_heldout.jsonl
+
+steps: 10
+batch: 8
+seed: 2026
+
+think_frac: 0.5
+think_soft_frac: 0.3
+no_think_soft_frac: 0.5
+math_tools: 1.0
+
+think_budget: 128
+max_answer_tokens: 300
+max_tool_calls: 2
+sampling: qwen
+presence_penalty: null
+sample_batch: 16
+
+micro_tokens: 2048
+micro_seqs: 8
+teacher_chunk: 4
+lr_frac: 0.5
+optimizer: same
+warmup: 2
+clip: 1.0
+
+eval_every: 5
+ckpt_every: 5
+keep: 2
+val_prompts: 16
+gsm8k_n: 16
+format_n: 6
+format_max_answer_tokens: 400
+eval_batch: 16
+
+patience: 50
+kl_min_delta: 0.0
+gsm8k_tol: 0.03
+format_tol: 1
+final: best
+
+memory_limit_gb: 8

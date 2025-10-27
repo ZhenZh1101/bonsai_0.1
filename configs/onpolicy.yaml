@@ -1,0 +1,57 @@
+# On-policy distillation from Qwen3-0.6B (plan section 12), bonsai/distill.py. Plan 14 command:
+#   python -m scripts.distill_onpolicy --teacher Qwen/Qwen3-0.6B --steps 150 --batch 256
+# Every key can be overridden with --set key=value; scripts/teacher_kl.py reads the sampling / scoring keys.
+
+teacher: Qwen3-0.6B            # teachers/<name>, bf16 prefill scoring over the student's subset S
+system_prompts: configs/offpolicy.yaml # the teacher scores in its off-policy generation context: these teacher-only
+                               #   system prompts by kind (math_tool when the tool is offered); null = none
+source: sft                    # start weights: ckpt/<run>/sft_final.safetensors (Bonsai-0.1-sft)
+prompts: data/prompts_onpolicy.jsonl   # 40k fresh prompts (plan 11 pool resampled, identity prompts removed)
+heldout: data/prompts_heldout.jsonl    # val KL (and plan 15's teacher KL)
+
+steps: 150                     # plan 12: 100-150 steps, ~10-15M scored tokens
+batch: 256                     # prompts per step (150 x 256 = 38.4k < 40k: no prompt repeats)
+seed: 2026
+
+# modes per prompt (random, the off-policy data's signals)
+think_frac: 0.5                # thinking (budget 128) vs non-thinking
+think_soft_frac: 0.3           # thinking: " /think" on 30%, else no switch (Qwen3 default = thinking)
+no_think_soft_frac: 0.5        # non-thinking: " /no_think" on half, the enable_thinking=False prefill on the rest
+math_tools: 1.0                # share of math prompts offered the python tool (prompts marked tools: always)
+
+# student sampling (bonsai.engine.chat_batch, current weights, no gradients)
+think_budget: 128
+max_answer_tokens: 300         # plan 12: answers <= 300 tokens
+max_tool_calls: 2              # plan 13
+sampling: qwen                 # Qwen3 presets by mode: think T 0.6 / top-p 0.95, no_think T 0.7 / top-p 0.8; top-k 20
+presence_penalty: null         # null = the presets' 1.5
+sample_batch: 64               # rows decoded together
+
+# scoring and the update
+micro_tokens: 2048             # scored positions per micro-batch (teacher prefill + student backward); 121M student:
+micro_seqs: 8                  #   peak ~9 GB at 2048 (measured), the (M, N) fp32 head / KL tensors grow linearly
+teacher_chunk: 4               # teacher rows per subset_logprobs chunk ((4, T, N) fp32 transient)
+lr_frac: 0.5                   # plan 12: 0.5 x the off-policy (SFT) LRs
+optimizer: same                # same = the SFT run's optimizer (Muon + AdamW by default); adamw = Qwen-style AdamW
+warmup: 10                     # steps of linear LR warmup (fresh optimizer state), then constant
+clip: 1.0
+
+# monitoring every eval_every steps (plan 12) and checkpoints
+eval_every: 25
+ckpt_every: 25
+keep: 3                        # full checkpoints kept in ckpt/<run>/onpolicy/
+val_prompts: 128               # held-out prompts for the val KL (fixed subset, fixed sampling seed)
+gsm8k_n: 200                   # GSM8K-style monitor: held-out math prompts with a numeric answer (all ~170 of
+                               #   data/prompts_heldout.jsonl; never the GSM8K test set), non-thinking + tool, greedy
+format_n: 20                   # format check conversations (evals.mode_switch dev prompts: /think, /no_think, prefill)
+format_max_answer_tokens: 400  # the SFT data's answer cap; a reply cut by it is counted apart, not as a format error
+eval_batch: 32
+
+# stop rules (plan 12) and the final weights
+patience: 50                   # stop when the val KL has not improved for 50 steps
+kl_min_delta: 0.0
+gsm8k_tol: 0.03                # stop when the GSM8K-style monitor < start - 0.03 (resume auto then goes back to best)
+format_tol: 1                  # stop when format errors > start + 1
+final: best                    # best = the healthy eval with the lowest val KL; last = the last weights
+
+memory_limit_gb: 40

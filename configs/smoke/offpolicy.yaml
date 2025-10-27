@@ -1,0 +1,82 @@
+# SMOKE TEST copy of configs/offpolicy.yaml: ~1/250 of the prompts, the 0.6B teacher, outputs under data/smoke/.
+# Off-policy distillation (plan section 11): the prompt pool (scripts/build_prompts.py) and the teacher
+# generation (scripts/gen_offpolicy.py). Plan 14 command:
+#   python -m scripts.gen_offpolicy --teacher Qwen/Qwen3-1.7B --prompts data/prompts.jsonl --modes think,no_think --budget 128
+
+prompts:
+  out: data/smoke/prompts.jsonl
+  onpolicy_out: data/smoke/prompts_onpolicy.jsonl
+  heldout_out: data/smoke/prompts_heldout.jsonl
+  stats_out: data/smoke/prompts_stats.json
+  total: 400
+  onpolicy: 160
+  heldout: 20
+  seed: 1111
+  max_prompt_tokens: 512 # teacher tokens of all prompt turns (the student context is 1024)
+  tail_headroom: 3.0     # from_end pools: read 3x the needed records from the end (filters drop some)
+  cursor_file: smoke/pool_cursors.json
+  # shares of each total; kinds: chat / explain / mc / math (tools: the python tool is offered)
+  sources:
+    # S1/S2 overlap (scripts/build_prompts.py, checked against cursor_file): sft_chat is never read by S1/S2, but
+    # SmolTalk subsets share questions: exclude_seen drops the ~2% whose first user turn S1/S2 trained on.
+    # ARC: the mc pool has 3,345 ARC train lines, only 758 after the S2 cursor (mc 90,958), and MMLU
+    # auxiliary_train contains ARC train, so 685 of those 758 questions were in S2's mc_chat anyway: prefer_unseen
+    # takes the ~70 unseen questions first (the held-out set), then the tail, then the rest; allow_overlap: same
+    # question, new supervision (after_cursor: true would keep only the 758 tail lines, ~0.75% instead of 2.5%).
+    # GSM8K train is S2 data (gsm8k_cot) and these prompts by design (plan 10 / 11).
+    chat:    {pool: sft_chat, kind: chat, share: 0.55, explain: false, multi_turn_frac: 0.15,
+              exclude_seen: [smoltalk_chat, smoltalk2_think]}
+    explain: {pool: sft_chat, kind: explain, share: 0.075, explain: true, first_turn_only: true,
+              exclude_seen: [smoltalk_chat, smoltalk2_think]}
+    arc:     {pool: mc, kind: mc, share: 0.025, match: {source: [arc-easy, arc-challenge]}, prefer_unseen: true,
+              allow_overlap: true}
+    gsm8k:   {pool: gsm8k_train, kind: math, share: 0.05, allow_overlap: true}
+    tinygsm: {pool: tinygsm, kind: math, share: 0.125, from_end: true, integer_answer: true}
+    omi2:    {pool: omi2_cot, kind: math, share: 0.125, from_end: true, integer_answer: true, no_latex: true,
+              max_ref_chars: 800, tail_headroom: 8.0}   # GSM8K-style part only (~15% of the tail qualifies)
+    tool:    {pool: tinygsm, kind: math, share: 0.05, from_end: true, integer_answer: true, tools: true}
+
+generation:
+  teacher: Qwen3-0.6B
+  out_dir: data/smoke/offpolicy
+  modes: [think, no_think]
+  budget: 128            # thinking tokens per think block, then chat.think_stop + </think> is forced
+                         # (THINK_STOP; THINK_STOP_TOOL '..., using the python tool.' in tool jobs)
+  max_answer_tokens: 400 # longer answers are dropped (plan 11)
+  max_tool_calls: 2      # plan 13
+  max_total_tokens: 2048
+  presence_penalty: 1.5  # Qwen3 model card (plan 11); T / top-p / top-k by mode in bonsai.teacher
+  think_soft_frac: 0.3   # thinking samples asked with " /think" (the rest: no switch = Qwen3 default)
+  no_think_soft_frac: 0.5  # non-thinking: half " /no_think", half enable_thinking=False (prefilled empty block)
+  batch: 32
+  prefill_batch: 16
+  chunk: 1024
+
+filters:                 # bonsai.teacher.sample_problems (re-apply with gen_offpolicy --refilter)
+  # math in thinking mode: "strict" = the final answer must occur in the thinking (anywhere in a budget-cut one,
+  # among the last 3 numbers of one that ended by itself); "contradiction" = budget-cut thinking is not checked
+  # (Qwen3 rarely reaches the answer within 128 tokens: strict keeps ~10-25% of thinking-mode math); "off".
+  think_answer: strict
+
+# Teacher-only system prompts (never stored in the samples): English only, short, the answer formats the
+# student is evaluated on (plan 13 / 15: 'Answer: <number>', 'Answer: <letter>').
+system_prompts:
+  chat: >-
+    You are a helpful assistant. Always reply in English, even if the user writes in another language. Be clear
+    and concise: keep the reply under 250 words, also for code, unless the user asks for more. Never mention your own name,
+    which model you are, or which company made you.
+  explain: >-
+    You are a helpful assistant. Always reply in English. Explain clearly and briefly, in a few short sentences
+    or a short list, at most about 200 words. Never mention your own name, which model you are, or which
+    company made you.
+  mc: >-
+    You are a helpful assistant. Always reply in English. The user gives a multiple-choice question. Start your
+    reply with "Answer: " and the letter of the correct choice on its own line, then explain why in one or two
+    sentences.
+  math: >-
+    You are a helpful assistant. Always reply in English. Solve the math problem with brief, clear steps.
+    Finish with a last line "Answer: " followed by the final number only (no units, no LaTeX).
+  math_tool: >-
+    You are a helpful assistant. Always reply in English. Do not compute the answer yourself: always call the
+    python tool first, with a short Python program that computes the final answer and prints it with print().
+    When the tool result arrives, reply with one line: "Answer: " followed by the printed number.

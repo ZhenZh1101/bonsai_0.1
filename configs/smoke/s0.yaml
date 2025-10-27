@@ -1,0 +1,15 @@
+# SMOKE copy of configs/s0.yaml: tiny budget, separate dirs (tok/smoke/s0, tok/smoke/val_s0).
+shard_dir: smoke/s0
+val_dir: smoke/val_s0
+val_fraction: 0.01
+total_tokens: 2.0e6
+seq_len: 512
+mask: true
+use_cursors: false
+seed: 7
+
+sources:
+  s0_shuffle_dyck: {pool: s0_shuffle_dyck, format: s0_text,       weight: 0.30, max_epochs: 2}
+  s0_dyck:         {pool: s0_dyck,         format: s0_text,       weight: 0.10, max_epochs: 2}
+  s0_mp_struct:    {pool: s0_mp_struct,    format: s0_text,       weight: 0.20, max_epochs: 2}
+  s0_derivations:  {pool: s0_derivations,  format: s0_derivation, weight: 0.40, max_epochs: 2}

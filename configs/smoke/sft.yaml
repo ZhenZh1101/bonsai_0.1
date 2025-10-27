@@ -1,0 +1,29 @@
+# SMOKE TEST copy of configs/sft.yaml (reads data/smoke/offpolicy, writes tok/smoke/).
+# Off-policy distillation SFT set (plan section 11): the teacher samples kept by scripts/gen_offpolicy.py +
+# 2% scripted identity conversations (plan 18) -> tok/offpolicy (pagoda's SFT format, student ids).
+# Built by `python -m scripts.build_sft`; trained by `python -m scripts.sft --data tok/offpolicy --epochs 2`
+# (full checkpoints in ckpt/<run>/sft/; after an interruption add `--resume auto`).
+
+offpolicy_glob: data/smoke/offpolicy/kept_*.jsonl
+shard_dir: smoke/offpolicy
+seq_len: 1024            # a conversation must fit one packed row (seq_len + 1 tokens incl. BOS)
+val_fraction: 0.1        # by prompt id: both modes of a prompt land in the same split
+seed: 404
+system_prompt_frac: 0.03 # ordinary samples that get the Bonsai system prompt (bonsai.identity.with_system_prompt)
+
+identity:                # scripted identity conversations, never from the teacher (plan 18)
+  pool: identity_chat    # raw/filtered/identity_chat.jsonl (scripts/gen_identity.py pools)
+  frac: 0.02             # of the final set
+  think_frac: 0.5        # thinking samples get bonsai.identity.short_reasoning as their think block
+  think_soft_frac: 0.3   # thinking: " /think" on 30%, else no switch
+  no_think_soft_frac: 0.5  # non-thinking: " /no_think" on half, the enable_thinking=False prefill on the other
+  system_prompt_frac: 0.25
+
+identity_sft:            # tok/identity_sft for the identity mini-SFT after on-policy distillation (plan 18)
+  shard_dir: smoke/identity_sft
+  replay_ratio: 3        # general off-policy samples per identity sample
+  val_fraction: 0.05
+  seed: 5
+  think_soft_frac: 0.3
+  no_think_soft_frac: 0.5
+  system_prompt_frac: 0.25

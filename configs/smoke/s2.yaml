@@ -1,0 +1,23 @@
+# SMOKE copy of configs/s2.yaml: tiny budget, separate dirs (tok/smoke/s2) and cursor file.
+shard_dir: smoke/s2
+val_dir: smoke/val
+cursor_file: smoke/pool_cursors.json
+total_tokens: 4.0e6
+seq_len: 1024
+seed: 202
+mask: true
+
+sources:
+  fineweb_edu_hq:      {pool: fineweb_edu_hq,      format: text,           weight: 0.148,  max_epochs: 1}
+  identity_text:       {pool: identity_text,       format: text,           weight: 0.002,  max_epochs: 1, min_tokens: 1}
+  cosmopedia_textbook: {pool: cosmopedia_textbook, format: text,           weight: 0.15,   max_epochs: 1}
+  tinygsm_tool:        {pool: tinygsm,             format: tool_chat,      weight: 0.20,   max_epochs: 1, soft_switch_frac: 0.3}
+  omi2_cot:            {pool: omi2_cot,            format: cot_think_chat, weight: 0.096,  max_epochs: 2, soft_switch_frac: 0.3, overlong: cut, max_cot_tokens: 256}
+  gsm8k_cot:           {pool: gsm8k_train,         format: cot_think_chat, weight: 0.004,  max_epochs: 2, soft_switch_frac: 0.3, overlong: cut, max_cot_tokens: 256}
+  fld_chat:            {pool: fld_chat,            format: think_chat,     weight: 0.08,   max_epochs: 2, soft_switch_frac: 0.3}
+  rc_short:            {pool: rc_short,            format: think_chat,     weight: 0.05,   max_epochs: 2, soft_switch_frac: 0.3}
+  smoltalk_chat:       {pool: smoltalk_chat,       format: chat,           weight: 0.0597, max_epochs: 1, mode: no_think, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  smoltalk2_think:     {pool: smoltalk2_think,     format: think_chat,     weight: 0.0597, max_epochs: 1.5, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  identity_chat:       {pool: identity_chat,       format: chat,           weight: 0.0006, max_epochs: 1, mode: mixed, identity_reasoning: true, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  mc:                  {pool: mc,                  format: mc_chat,        weight: 0.08,   max_epochs: 2, soft_switch_frac: 0.3}
+  stack_python:        {pool: stack_python,        format: code,           weight: 0.07,   max_epochs: 1, max_tokens: 8192}

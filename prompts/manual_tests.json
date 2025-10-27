@@ -1,0 +1,245 @@
+{
+  "_note": "Manual tests (plan section 15), frozen before training: pagoda's 20 (writing, instructions, qa, math; expected at this scale: writing 4/5, instructions 3/5, QA 2/5, math 2-3/5) plus 5 mode-switch and 5 multi-turn tool-call conversations (expected 5/5 and >= 3/5; below that check the template / special tokens, resp. the tool protocol and the sandbox continuation). Math and tool items run non-thinking with tools=chat.TOOLS. Sampling: Qwen3's presets (thinking T 0.6 / top-p 0.95, non-thinking T 0.7 / top-p 0.8, top-k 20). mode_switch 'expect': think = non-empty think block, no_think = empty block, prefilled = enable_thinking false and no new <think>.",
+  "writing": [
+    "Write a children's story of about 200 words about a little turtle who is afraid of the water.",
+    "Write a short paragraph that explains to a ten-year-old how plants make food from sunlight.",
+    "Rewrite this sentence in a formal tone: \"hey, can u send me that report asap? thx\"",
+    "Continue this story: \"The old lighthouse had been dark for twenty years, until one stormy night...\"",
+    "Write an outline for an essay about the benefits of reading books."
+  ],
+  "instructions": [
+    "List three benefits of regular exercise.",
+    "Give the name, capital and continent of Japan in exactly this format: Name | Capital | Continent",
+    "Describe a cat in no more than 20 words.",
+    "Describe the ocean without using the word \"water\".",
+    "First name a fruit that is red. Then write one sentence about why people like it."
+  ],
+  "qa": [
+    "Why is the sky blue?",
+    "Who wrote Hamlet?",
+    "Who won the 1987 Tasmanian Regional Junior Chess Championship?",
+    "What is a definition of photosynthesis?",
+    "What is the difference between weather and climate?"
+  ],
+  "math": [
+    {
+      "prompt": "Tom has 5 apples and buys 7 more. How many apples does he have now?",
+      "answer": 12,
+      "kind": "1 step"
+    },
+    {
+      "prompt": "A book costs $12 and a pen costs $3. How much do 2 books and 4 pens cost in total?",
+      "answer": 36,
+      "kind": "2 steps"
+    },
+    {
+      "prompt": "A farmer has 3 fields with 24 rows of corn in each field. Each row has 15 plants. He sells one third of all the plants. How many plants does he have left?",
+      "answer": 720,
+      "kind": "3 steps"
+    },
+    {
+      "prompt": "A car drives at 60 kilometers per hour for 2 hours and 30 minutes. How many meters does it travel?",
+      "answer": 150000,
+      "kind": "unit conversion"
+    },
+    {
+      "prompt": "A teacher wants to share 100 stickers equally among the students who came to class today. No students came today. How many stickers does each student get?",
+      "answer": null,
+      "kind": "code that errors (division by zero); pass = model reports it cannot be divided"
+    }
+  ],
+  "mode_switch": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is the capital of Italy? /no_think"
+        }
+      ],
+      "expect": "no_think"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Explain why ice floats on water. /think"
+        }
+      ],
+      "expect": "think"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Name three primary colors."
+        }
+      ],
+      "enable_thinking": false,
+      "expect": "prefilled"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Tell me a fun fact about octopuses. /think"
+        },
+        {
+          "role": "assistant",
+          "content": "Octopuses have three hearts and blue blood."
+        },
+        {
+          "role": "user",
+          "content": "Nice! Now one about dolphins. /no_think"
+        }
+      ],
+      "expect": "no_think",
+      "kind": "multi-turn, the last switch wins"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "Give me a one-line definition of gravity. /no_think"
+        },
+        {
+          "role": "assistant",
+          "content": "Gravity is the force that pulls masses toward each other."
+        },
+        {
+          "role": "user",
+          "content": "Now explain how it keeps the Moon in orbit. /think"
+        }
+      ],
+      "expect": "think",
+      "kind": "multi-turn, the last switch wins"
+    }
+  ],
+  "tool_multi_turn": [
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "I'm planning a party for 12 kids."
+        },
+        {
+          "role": "assistant",
+          "content": "That sounds fun! How can I help?"
+        },
+        {
+          "role": "user",
+          "content": "Each kid gets 3 balloons, and balloons come in packs of 10. How many packs do I need to buy?"
+        }
+      ],
+      "answer": 4,
+      "kind": "context from an earlier turn, rounding up"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "A train leaves the station at 9:00 and travels at 80 km per hour."
+        },
+        {
+          "role": "assistant",
+          "content": "Okay. What would you like to know about the train?"
+        },
+        {
+          "role": "user",
+          "content": "How many kilometers has it traveled by 11:30?"
+        }
+      ],
+      "answer": 200,
+      "kind": "context from an earlier turn, time arithmetic"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "What is 15% of 240?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning_content": "",
+          "tool_calls": [
+            {
+              "name": "python",
+              "arguments": {
+                "code": "print(0.15 * 240)"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "36.0"
+        },
+        {
+          "role": "assistant",
+          "content": "Answer: 36",
+          "reasoning_content": ""
+        },
+        {
+          "role": "user",
+          "content": "Now add 7% sales tax to 240 instead. What is the total?"
+        }
+      ],
+      "answer": 256.8,
+      "kind": "history holds a tool trajectory"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "My savings account has $1,500."
+        },
+        {
+          "role": "assistant",
+          "content": "Got it, you have $1,500 saved."
+        },
+        {
+          "role": "user",
+          "content": "If I deposit $250 every month for a year, how much will I have at the end of the year?"
+        }
+      ],
+      "answer": 4500,
+      "kind": "context from an earlier turn"
+    },
+    {
+      "messages": [
+        {
+          "role": "user",
+          "content": "A rectangle is 14 cm by 9 cm. What is its area in square centimeters?"
+        },
+        {
+          "role": "assistant",
+          "content": "",
+          "reasoning_content": "",
+          "tool_calls": [
+            {
+              "name": "python",
+              "arguments": {
+                "code": "print(14 * 9)"
+              }
+            }
+          ]
+        },
+        {
+          "role": "tool",
+          "content": "126"
+        },
+        {
+          "role": "assistant",
+          "content": "Answer: 126",
+          "reasoning_content": ""
+        },
+        {
+          "role": "user",
+          "content": "What is the side length of a square with the same area? Round to two decimals."
+        }
+      ],
+      "answer": 11.22,
+      "kind": "history holds a tool trajectory, follow-up needs a second call"
+    }
+  ]
+}

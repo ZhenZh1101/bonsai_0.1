@@ -1,0 +1,31 @@
+# S1: general pretraining, the constant-LR segment (plan section 10; DESIGN 1.3).
+#
+# 5-day run: 2.0B tokens in total (decision of 2026-10-26, after the day-0 benchmark measured 6.8k tok/s for
+# 14 x 640), no S0 (the S0 ablation said drop): S1 = 75% + half of the 200-step transition = 1.487B tokens. Built
+# with 1.52e9 (2% margin); the documents of all sources are shuffled together, so smaller runs (3-day 750M,
+# the S0 ablation) read a prefix with exactly the same mix. Nemotron-CC (~191M unique) and the synthetic
+# reasoning (~43M) repeat 1.2x / 1.4x, within their epoch caps.
+# 44% high-quality short text (Cosmopedia + Nemotron-CC synthetic + synthetic step-by-step reasoning).
+# ChatML text: SmolTalk conversations with the empty think block, no soft switches (non-thinking).
+#
+# Knobs (move one at a time, <= 10 points, then rerun scripts.build_shards):
+#   more math:  cosmopedia +5, finemath +5, fineweb_edu -10
+#   more chat:  the reverse
+
+shard_dir: s1
+val_dir: val
+val_fraction: 0.01        # 1% of every source -> tok/val, fixed for the whole project
+total_tokens: 1.52e9
+seq_len: 1024
+seed: 101
+
+sources:
+  cosmopedia:      {pool: cosmopedia,      format: text,         weight: 0.25, max_epochs: 2}   # textbooks, stories, WikiHow
+  nemotron_cc:     {pool: nemotron_cc,     format: text,         weight: 0.15, max_epochs: 2}   # 4 synthetic kinds
+  synth_reasoning: {pool: synth_reasoning, format: text,         weight: 0.04, max_epochs: 2}   # arith, iGSM-style, FLD text
+  fineweb_edu:     {pool: fineweb_edu,     format: text,         weight: 0.25, max_epochs: 1}   # score >= 3
+  dclm:            {pool: dclm,            format: text,         weight: 0.07, max_epochs: 1}
+  finemath:        {pool: finemath,        format: text,         weight: 0.09, max_epochs: 2}   # FineMath-4+
+  tinygsm:         {pool: tinygsm,         format: tinygsm_text, weight: 0.03, max_epochs: 1}
+  stack_python:    {pool: stack_python,    format: code,         weight: 0.08, max_epochs: 1, max_tokens: 8192}
+  smoltalk_chat:   {pool: smoltalk_chat,   format: chat,         weight: 0.04, max_epochs: 1, mode: no_think, max_reply_tokens: 512}

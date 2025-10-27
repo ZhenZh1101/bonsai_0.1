@@ -1,0 +1,41 @@
+# S2: reasoning anneal, the LR-decay segment (plan section 10; DESIGN 1.3).
+#
+# 5-day run: 513M tokens (25% of 2.0B plus half of the 200-step 50/50 S1/S2 transition); built with 5.25e8 so
+# the decay never wraps around; smaller runs read a prefix with the same mix. Shared pools (tinygsm,
+# smoltalk_chat, stack_python, ...) continue after the S1 cursor (tok/pool_cursors.json).
+#
+# Every ChatML sample carries a think block: empty (non-thinking) or <= 128 teacher tokens (thinking);
+# 30% of them (stable hash) get the soft switch of their mode appended to the last user turn (/think, /no_think).
+#   tool_chat       TinyGSM in the python-tool protocol, non-thinking
+#   cot_think_chat  CoT as thinking + 'Answer: x'. Only 12% of the OMI-2 pool has a CoT <= 128 tokens (9.5M of
+#                   the 40M target), so CoTs of 129-256 tokens are cut with chat.budget_thinking (+ THINK_STOP,
+#                   plan section 6) and longer ones dropped; `overlong: drop` keeps only <= 128 (then ~19M x2)
+#   think_chat      FLD / Reasoning Core (user, reasoning, answer) and SmolTalk2 *_think conversations
+#   smoltalk        12% = smoltalk_chat 5.99% non-thinking + smoltalk2_think 5.97% thinking + identity_chat 0.04%
+#                   (the whole shuffled pool once: 2,163 conversations, ~220k tokens as rendered here, both modes;
+#                   plan section 18); identity_text 0.2% of the web text
+#   mc_chat         MMLU auxiliary_train + ARC train, 'Answer: B', non-thinking
+# Loss: every token (the weights count all of them), except the tools system block of each tool_chat sample
+# (172 tokens of constant context, half of a TinyGSM doc), which has mask 0 -> shard_*.mask (`mask: true`).
+
+shard_dir: s2
+val_dir: val              # no val split of its own: training docs identical to a tok/val doc are dropped
+total_tokens: 5.25e8
+seq_len: 1024
+seed: 202
+mask: true                # tool_chat: tools block = context (render.py); every other doc all ones
+
+sources:
+  fineweb_edu_hq:      {pool: fineweb_edu_hq,      format: text,           weight: 0.148,  max_epochs: 1}   # score >= 4, unseen in S1
+  identity_text:       {pool: identity_text,       format: text,           weight: 0.002,  max_epochs: 1, min_tokens: 1}
+  cosmopedia_textbook: {pool: cosmopedia_textbook, format: text,           weight: 0.15,   max_epochs: 1}
+  tinygsm_tool:        {pool: tinygsm,             format: tool_chat,      weight: 0.20,   max_epochs: 1, soft_switch_frac: 0.3}
+  omi2_cot:            {pool: omi2_cot,            format: cot_think_chat, weight: 0.096,  max_epochs: 2, soft_switch_frac: 0.3, overlong: cut, max_cot_tokens: 256}
+  gsm8k_cot:           {pool: gsm8k_train,         format: cot_think_chat, weight: 0.004,  max_epochs: 2, soft_switch_frac: 0.3, overlong: cut, max_cot_tokens: 256}
+  fld_chat:            {pool: fld_chat,            format: think_chat,     weight: 0.08,   max_epochs: 2, soft_switch_frac: 0.3}
+  rc_short:            {pool: rc_short,            format: think_chat,     weight: 0.05,   max_epochs: 2, soft_switch_frac: 0.3}
+  smoltalk_chat:       {pool: smoltalk_chat,       format: chat,           weight: 0.0599, max_epochs: 1.5, mode: no_think, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  smoltalk2_think:     {pool: smoltalk2_think,     format: think_chat,     weight: 0.0597, max_epochs: 1.5, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  identity_chat:       {pool: identity_chat,       format: chat,           weight: 0.0004, max_epochs: 1, mode: mixed, identity_reasoning: true, soft_switch_frac: 0.3, max_reply_tokens: 512}
+  mc:                  {pool: mc,                  format: mc_chat,        weight: 0.08,   max_epochs: 2, soft_switch_frac: 0.3}
+  stack_python:        {pool: stack_python,        format: code,           weight: 0.07,   max_epochs: 1, max_tokens: 8192}

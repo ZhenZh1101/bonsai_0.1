@@ -1,0 +1,25 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+# data and artifacts
+raw/
+tok/
+ckpt/
+logs/
+sandbox/
+teachers/
+external/
+tokenizer/sample/
+export/
+/data/
+dist/
+# reproducible identity outputs and tokenizer measurement artifacts
+identity/conversations.jsonl
+identity/pretrain.jsonl
+identity/report.json
+tokenizer/sample_counts.npy
+tokenizer/vocab_report.json
+# Local Chinese source; the published plan is in English.
+/bonsai_plan_v0.1.zh-CN.md

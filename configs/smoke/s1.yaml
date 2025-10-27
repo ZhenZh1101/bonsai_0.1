@@ -1,0 +1,19 @@
+# SMOKE copy of configs/s1.yaml: tiny budget, separate dirs (tok/smoke/s1, tok/smoke/val) and cursor file.
+shard_dir: smoke/s1
+val_dir: smoke/val
+cursor_file: smoke/pool_cursors.json
+val_fraction: 0.01
+total_tokens: 6.0e6
+seq_len: 1024
+seed: 101
+
+sources:
+  cosmopedia:      {pool: cosmopedia,      format: text,         weight: 0.25, max_epochs: 2}
+  nemotron_cc:     {pool: nemotron_cc,     format: text,         weight: 0.15, max_epochs: 2}
+  synth_reasoning: {pool: synth_reasoning, format: text,         weight: 0.04, max_epochs: 2}
+  fineweb_edu:     {pool: fineweb_edu,     format: text,         weight: 0.25, max_epochs: 1}
+  dclm:            {pool: dclm,            format: text,         weight: 0.07, max_epochs: 1}
+  finemath:        {pool: finemath,        format: text,         weight: 0.09, max_epochs: 2}
+  tinygsm:         {pool: tinygsm,         format: tinygsm_text, weight: 0.03, max_epochs: 1}
+  stack_python:    {pool: stack_python,    format: code,         weight: 0.08, max_epochs: 1, max_tokens: 8192}
+  smoltalk_chat:   {pool: smoltalk_chat,   format: chat,         weight: 0.04, max_epochs: 1, mode: no_think, max_reply_tokens: 512}
